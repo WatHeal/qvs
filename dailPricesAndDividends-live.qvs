@@ -1,0 +1,1784 @@
+﻿///$tab START
+//==============================================
+
+Let vThisExecTime = date#(Now());
+
+//==============================================
+
+
+
+
+//TEMP:
+//Let vLastExecTime = date#(1);
+//Let vLastExecTime = date#(42511); 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='£#,##0.00;(£#,##0.00)';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='DD/MM/YYYY';
+SET TimestampFormat='DD/MM/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+
+
+
+//**************We use this Variable to solve the 
+SET vMyRound=round(num#(text($2 * $1))/$2 ,10/$2);
+
+
+Set HidePrefix = '%';
+
+// **************** UPDATE THIS WHEN TESTING **********************
+set vExport = 'yes';
+
+//-> CHANGE REQUEST FIX: link to bny
+//-> new fund class codes to fix minor to major price change
+//-> also used to reverse engineer back to old code.
+//-> date applied: 2019-07-11
+//-> dev: NP/DT
+mapLinkSterlingFix:
+mapping load * inline [
+	__FROM__, __TO__
+	301050 8, 301050 3
+	301050 9, 301050 5
+	301100 8, 301100 3
+	301100 9, 301100 5
+];
+
+mapLinkSterlingMultiplier:
+mapping load * inline [
+	__FROM__, __MULTIPLIER__
+	301050 4, 100
+	301050 6, 100
+	301100 4, 100
+	301100 6, 100
+];
+
+///$tab Data sources
+//--------------------------------------------------------------------------------------------------------------------------------------------------
+
+SET vFileLocation_UK_Prices = 		
+	'\\majftp\SFTProot\BNY\UK Prices\'
+	;
+SET vFileLocation_Irish_Prices = 
+	'\\majftp\SFTProot\BNY\Irish Prices\'
+	;
+
+
+//---------------------------------------------------------------------//
+//-> ### LIVE ###
+
+	SET vFileLocation_PriceHistory =
+		'\\maj-file01\majedie\Operations\QV source - prices and dividends\SOURCE - Historical Prices.xlsx'
+		;
+	SET vFileLocation_EOMPriceHistory =
+		'\\maj-file01\majedie\Operations\QV source - prices and dividends\SOURCE - EOM price history.xls'
+		;
+	SET vFileLocation_FundIdentifiers =
+		'\\maj-file01\majedie\Operations\QV source - prices and dividends\SOURCE - Fund identifiers.xls'
+		;
+	SET vFileLocation_DividendHistory =	
+		'\\maj-file01\majedie\Operations\QV source - prices and dividends\SOURCE - historical dividend rates.xlsx'
+		;
+	SET vFile_SwingRateHistory = 
+		'\\maj-qv\qlikview\QlikViewDocuments\SwingRateHistory.csv'
+		;
+		
+SET vExportFile_Dividends =
+	'\\maj-file01\majedie\Operations\QV source - prices and dividends\EXPORT_Dividends.csv'
+	;
+SET vExportFile_Prices_with_Swings =
+	'\\maj-file01\majedie\Operations\Database Upload\NEW DATABASE 2014\Fund Prices Daily\EXPORT_Prices_with_Swings.csv'	
+	;
+SET vExportFile_Prices_with_SwingsCOPY =
+	'\\maj-file01\majedie\Operations\QV source - prices and dividends\EXPORT_Prices_with_Swings.csv'	
+	;
+Set vExportFile_UKSCmidprices =
+	'\\maj-qv\Qlikview\QlikViewDocuments\Datasources\TRANSACTION FEEDERS\UKSC_mid_prices.csv'	
+	;
+Set vExportFile_DailyPrices =
+	'\\maj-file01\majedie\Operations\IT\Price files for updating website\PricesTemplate.csv'
+	;
+	
+//---------------------------------------------------------------------//
+//-> ### TEST ###
+
+//	SET vExportFile_Dividends =
+//		'data\EXPORT_Dividends.csv'
+//		;
+//	SET vExportFile_Prices_with_Swings =
+//		'data\EXPORT_Prices_with_Swings.csv'	
+//		;
+//	SET vExportFile_Prices_with_SwingsCOPY =
+//		'data\EXPORT_Prices_with_Swings.csv'	
+//		;
+//	Set vExportFile_UKSCmidprices =
+//		'data\UKSC_mid_prices.csv'	
+//		;
+
+//---------------------------------------------------------------------//
+
+
+
+
+Datasource_list:
+LOAD * INLINE [
+    Datasource_filepath
+    MAIN DATA CONTACTS: OPS TEAM / SARAH HYMERS
+    __
+	$(vFileLocation_UK_Prices)Majedie??-??-??.csv
+	$(vFileLocation_UK_Prices)MIT??-??-??.csv
+	$(vFileLocation_UK_Prices)MajedieTortoise??-??-??.csv
+	$(vFileLocation_Irish_Prices)*Price Sheet*.xls
+	$(vFileLocation_Irish_Prices)*BNYMIRLConval.xls
+	$(vFileLocation_Irish_Prices)*Prices Sheet*.xls
+	$(vFileLocation_Irish_Prices)Majedie*UK*Swing*Report*.xlsx
+	$(vFileLocation_Irish_Prices)Majedie*US*Swing*Report*.xlsx
+	$(vFileLocation_PriceHistory)
+	$(vFileLocation_EOMPriceHistory)
+	$(vFileLocation_FundIdentifiers)
+	$(vFileLocation_DividendHistory)
+	$(vFile_SwingRateHistory)
+    __
+	FOR INCREMENTAL LOAD:  
+	\\maj-qv\qlikview\qlikviewdocuments\PricesHistory_Data.csv
+	\\maj-qv\qlikview\qlikviewdocuments\PricesHistory_Dates.csv
+    __
+    EXPORT LOCATIONS:
+	$(vExportFile_Dividends)
+	$(vExportFile_Prices_with_Swings)
+	$(vExportFile_Prices_with_SwingsCOPY)
+	$(vExportFile_UKSCmidprices)
+];
+
+
+//	$(vFileLocation_Irish_Prices)*MajedieTort*.xls
+//	$(vFileLocation_Irish_Prices)*GenericNAV.Majedie.*.xls
+//	$(vFileLocation_Irish_Prices)*GenericNAV.Majedie.UKIF.*.xls
+//	$(vFileLocation_Irish_Prices)*GenericNAV.Majedie.USEF.*.xls
+///$tab >>>.>>>
+///$tab Daily Prices - inc load  FIRST STEP
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	CURRENT FILE LIST
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+//================================================================================================================
+// 	Make a list of the current files
+//================================================================================================================
+	
+	CurrentFileList:
+	
+	
+		//EIT Market Price:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp
+		FROM [$(vFileLocation_UK_Prices)EIT_MKT*.csv](txt, utf8, embedded labels, delimiter is ',', msq);
+		
+	Concatenate
+		//EIT NAV:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp
+		FROM [$(vFileLocation_UK_Prices)EIT_NAV*.csv](txt, utf8, embedded labels, delimiter is ',', msq);
+	
+	
+	Concatenate
+		//OEICS:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp 
+		FROM [$(vFileLocation_UK_Prices)Majedie??-??-??.csv] (txt, codepage is 1252, no labels, delimiter is ',', msq);
+
+	Concatenate
+		//MIT:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp 
+		FROM [$(vFileLocation_UK_Prices)MIT??-??-??.csv] (txt, codepage is 1252, no labels, delimiter is ',', msq);
+
+	Concatenate
+		//Onshore Tortoise & Global:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp 
+		FROM [$(vFileLocation_UK_Prices)MajedieTortoise??-??-??.csv] (txt, codepage is 1252, no labels, delimiter is ',', msq);
+
+	Concatenate
+		//Offshore Tortoise:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp 
+	    FROM [$(vFileLocation_Irish_Prices)*BNYMIRLConval.xls] (biff, embedded labels);	
+
+	Concatenate
+		//Offshore Global (OLD):
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp 
+		FROM [$(vFileLocation_Irish_Prices)*Prices Sheet*.xls] (biff, embedded labels, header is 3 lines);
+
+	Concatenate
+		//Offshore UKEF, offshore UKIF:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp
+		FROM [$(vFileLocation_Irish_Prices)Majedie*UK*Swing*Report*.xlsx](ooxml, embedded labels);
+
+	Concatenate
+		//Offshore USEF:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp
+		FROM [$(vFileLocation_Irish_Prices)Majedie*US*Swing*Report*.xlsx](ooxml, embedded labels);
+
+	Concatenate
+		//Offshore MINT:
+		FIRST 1 LOAD DISTINCT FilePath() as File_temp
+		FROM [$(vFileLocation_Irish_Prices)Majedie*Int*Swing*Report*.xlsx](ooxml, embedded labels);
+		
+
+					
+	
+
+//================================================================================================================
+// 	Store the list of current files as a QVD (to refer to later in the inner join)
+//================================================================================================================
+	//STORE File_temp as File FROM CurrentFileList INTO CurrentFileList.QVD;
+	
+	IF lower(vExport) = 'yes' then
+		STORE File_temp as File FROM CurrentFileList INTO CurrentFileList.csv(txt);
+	ENDIF
+
+//================================================================================================================
+// 	Make a variable listing the current files (to use in the "For each vFile in vFileList" statement later)
+//================================================================================================================
+	LET vFileList=''; //Start with a blank list
+	
+	For i=0 to NoOfRows('CurrentFileList')-1
+
+		let vFileList =	vFileList & Peek('File_temp',i,'CurrentFileList') & ','	;  
+				//Concatenate list of current files (with ',' separator)
+
+	Next;
+	
+	LET  vFileList = chr(39)&	replace( 
+								Left('$(vFileList)', len('$(vFileList)')-1) 	, ','	 //Remove the final separator ','
+								,	chr(39)&','&chr(39)	)	&chr(39) ; //The replace statement and surrounding chr(39)s encase each element in single quotes
+
+//================================================================================================================
+// 	Drop the script table once file list created (in QVD and vFileList), so as not to interfere with the field structure in the rest of the script
+//================================================================================================================
+	DROP Table CurrentFileList;
+
+
+
+
+
+
+
+
+///$tab Daily Prices - data no dates
+// --------- From 21-Sep-15 this version used (offshore long only swing reports instead of price files)
+//Mapping table to handle changes BNY makes on the FundClass codes
+MapFundIdentifier:
+Mapping load
+ [FundClass 3]	as	[TA Code], // E.g. 291000 4
+ FundClass // E.g. 270200 2, MAJUKINCAC01
+FROM
+[$(vFileLocation_FundIdentifiers)]
+(biff, embedded labels, table is Sheet1$);		
+
+
+
+//Mapping table for swing decisions in Dublin swing reports
+Map_SwingDirection_Rename:
+Mapping
+LOAD * INLINE [
+    Direction UPPER, Renamed
+    TO OFFER, Swung Up
+    TO BID, Swung Down
+    NO SWING, No Swing
+];
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	NEW/UPDATED FILES
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+Data: //Start the table off so we can concatenate to it later on
+LOAD * INLINE [
+    File, Price, FundClass, Pricing Basis, Pricing Point, Yield, IRISH LONG ONLY - Date, IRISH LONG ONLY - Fund Name, IRISH LONG ONLY - Total Net Assets, IRISH LONG ONLY - Base Fund Currency
+];
+
+
+// 	WORK THROUGH THE CURRENT FILE LIST AND PICK OUT DATA FOR THOSE FILES WHICH ARE NEW/UPDATED SINCE LAST EXECUTION
+
+// For each vFile in '2012-07-06 - Majedie06-07-12.csv','2012-07-09 - Majedie09-07-12.csv','2012-07-10 - Majedie10-07-12.csv'
+ For each vFile in $(vFileList)
+
+
+
+//================================================================================================================
+// If the file has NOT been added/updated since last execution:
+IF 	FileTime('$(vFile)') < '$(vLastExecTime)'  THEN  	//IF 	FileTime('$(vFileLocation)'&'$(vFile)') < '$(vLastExecTime)'  THEN 
+//================================================================================================================
+		LET vDummy = '$(vFile)'; 	// vDummy statement achieves nothing, just a quick script event to make the IF...THEN...ELSE...ENDIF statement work
+				
+//================================================================================================================
+ELSE		// If the file HAS been added/updated since last execution:
+//================================================================================================================
+
+	
+		//-----------------------------------------------------------------------------------------------
+		//OEICs
+		//-----------------------------------------------------------------------------------------------
+		IF '$(vFile)' like '*UK Prices\Majedie??-??-??.csv' THEN
+					
+			//-----------
+			Concatenate (Data) //Data:
+			//-----------
+					load
+						*,
+						FileName() & '_' & FundClass as PrimaryKey_File_FundClass
+					;
+					LOAD 
+						FilePath() as File,
+						applymap('mapLinkSterlingMultiplier', [Fund/Class], 1) * [Unrounded Prices] as Price, 
+						applymap('mapLinkSterlingFix', [Fund/Class], [Fund/Class]) as FundClass,
+						Yield, //ADDED IN 29/10/2012
+						Basis as [Pricing Basis],  //ADDED IN 05/08/2014
+						'noon' as [Pricing Point]  //ADDED IN 13/08/2014
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, embedded labels, delimiter is ',', msq, header is 2 lines);
+
+
+		//-----------------------------------------------------------------------------------------------
+		//MIT
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\MIT??-??-??.csv' THEN
+					
+			//-----------
+			Concatenate (Data) //Data:
+			//-----------
+									
+					LOAD FilePath() as File,
+						[Unrounded Prices] as Price, 
+						[Fund/Class] as FundClass,
+						FileName()&'_'&[Fund/Class] as PrimaryKey_File_FundClass
+							,Yield //ADDED IN 29/10/2012
+							,Basis as [Pricing Basis]  //ADDED IN 05/08/2014
+							,'noon' as [Pricing Point]  //ADDED IN 13/08/2014
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, embedded labels, delimiter is ',', msq, header is 2 lines);
+
+
+		//-----------------------------------------------------------------------------------------------
+		//Onshore Global & Tortoise
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\MajedieTortoise??-??-??.csv' THEN
+				
+			//-----------
+			Concatenate (Data)  //Data:
+			//-----------
+								
+					LOAD FilePath() as File,
+						[Unrounded Prices] as Price, 
+						[Fund/Class] as FundClass,
+						FileName()&'_'&[Fund/Class] as PrimaryKey_File_FundClass
+							,Yield //ADDED IN 29/10/2012
+							,Basis as [Pricing Basis]  //ADDED IN 05/08/2014
+							,'COB' as [Pricing Point]  //ADDED IN 13/08/2014
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, embedded labels, delimiter is ',', msq, header is 2 lines);
+					
+		
+		
+		//-----------------------------------------------------------------------------------------------
+		//EDINBURGH INVESTMENT TRUST
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\EIT*.csv' THEN
+				
+			//-----------
+			Concatenate (Data)  //Data:
+			//-----------
+								
+					LOAD FilePath() as File,
+						PurgeChar([Unrounded Prices], 'p') as Price, 
+						[Fund/Class] as FundClass,
+						FileName()&'_'&[Fund/Class] as PrimaryKey_File_FundClass
+							,'0' AS Yield
+							,Basis as [Pricing Basis] 
+							,'COB' as [Pricing Point] 
+					FROM [$(vFile)] 
+					(txt, utf8, embedded labels, delimiter is ',', msq);			
+	
+		
+			
+		//-----------------------------------------------------------------------------------------------
+		//Offshore Tortoise
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\*BNYMIRLConval.xls' THEN	//'*Irish Prices\*MajedieTort*.xls' THEN		// 24-Jan-17 change filename format for Tortoise offshore prices
+			
+			//-----------
+			Concatenate (Data)  //Data:
+			//-----------
+														
+					LOAD FilePath() as File,
+						 Name as FundClass, 
+     					 [NAV / Share] as Price,
+						 FileName()&'_'&Name as PrimaryKey_File_FundClass
+							,'NAV' as [Pricing Basis] 
+							,'COB' as [Pricing Point] 
+					FROM [$(vFile)] //FROM	[$(vFileLocation_Irish_Prices)$(vFile)]
+					(biff, embedded labels, 
+					header is $(if(only(@2)='Previous NAV',2,3)) lines, //4-Jan-13 edit: the format sometimes has an entry in cell E3 which changes the recognised header
+					table is [Final price sheet$], 
+					filters(Remove(Row, RowCnd(CellValue, 4, StrCnd(null)))	)
+					);
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore Global
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\*Prices Sheet*.xls' THEN
+			
+			//-----------
+			Concatenate (Data)  //Data:
+			//-----------
+								
+					LOAD FilePath() as File,
+						Name as FundClass, 
+						[NAV / Share] as Price,
+						FileName()&'_'&Name as PrimaryKey_File_FundClass
+							,'NAV' as [Pricing Basis]  //ADDED IN 05/08/2014
+							,'COB' as [Pricing Point]  //ADDED IN 13/08/2014
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(biff, embedded labels, header is 2 lines, filters(
+					Remove(Row, RowCnd(CellValue, 4, StrCnd(null)))
+					));			
+
+									
+		//-----------------------------------------------------------------------------------------------
+		//Offshore UKIF and UKEF  -------- 21-Sep-15: now using the swing reports for prices instead
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*UK*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate (Data) //Data:
+			//-----------								
+								
+					LOAD FilePath() as File,
+						
+						ApplyMap('MapFundIdentifier',	[Fund Number]&' '&right([Fund Name],1)
+													,	[Fund Number]&' '&right([Fund Name],1)
+												)	as FundClass, // E.g. 291000 4
+						
+					     //round([Final NAV (Class CCY)],0.0001) as Price, //[Final NAV (Class CCY)] as Price,  // * * * * * * SAH: 7 Jan 2016 edit - BNY swing reports don't have rounded prices, official prices are rounded to 4dp.
+					     round(floor(100000*num(Num#([Final NAV (Class CCY)])))/100000,0.0001) as Price,	  // * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+					     
+					     FileName()&'_'&applyMap('MapFundIdentifier',[Fund Number]&' '&right([Fund Name],1)  ,  [Fund Number]&' '&right([Fund Name],1))
+					     			as PrimaryKey_File_FundClass,
+					     
+					     if(upper(Decision)='NO SWING REQUIRED', 'No Swing',
+					     				applymap('Map_SwingDirection_Rename',upper(Direction),Direction)
+					     			) as [Pricing Basis], 					     			
+					     
+					     'noon' as [Pricing Point]
+					     
+					FROM [$(vFile)] //FROM  [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, header is 3 lines, 
+					table is [Daily Swing Report], 
+					filters(
+					Remove(Row, RowCnd(CellValue, 2, StrCnd(null))), //Keep those with fund names (inc fund level at this stage) - cuts headers/footers
+					Replace(6, top, StrCnd(null)), //Fill down swing DECISION from fund level to share class level
+					Replace(7, top, StrCnd(null)), //Fill down swing DIRECTION from fund level to share class level
+					Remove(Row, RowCnd(CellValue, 15, StrCnd(null))) //Remove the fund level stuff - any with blank share price
+					));
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore USEF  -------- 21-Sep-15: now using the swing reports for prices instead
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*US*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate (Data)  //Data:
+			//-----------
+								
+					LOAD FilePath() as File,
+						
+						ApplyMap('MapFundIdentifier',	[Fund Number]&' '&right([Fund Name],1)
+													,	[Fund Number]&' '&right([Fund Name],1)
+												)	as FundClass, // E.g. 291000 4
+						
+					     //round([Final NAV (Class CCY)],0.0001) as Price, //[Final NAV (Class CCY)] as Price,  // * * * * * * SAH: 7 Jan 2016 edit - BNY swing reports don't have rounded prices, official prices are rounded to 4dp.
+					     round(floor(100000*num(Num#([Final NAV (Class CCY)])))/100000,0.0001) as Price,	  // * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+					     
+					     FileName()&'_'&applyMap('MapFundIdentifier',[Fund Number]&' '&right([Fund Name],1)  ,  [Fund Number]&' '&right([Fund Name],1))
+					     			as PrimaryKey_File_FundClass,
+					     
+					     if(upper(Decision)='NO SWING REQUIRED', 'No Swing',
+					     				applymap('Map_SwingDirection_Rename',upper(Direction),Direction)
+					     			) as [Pricing Basis], 					     			
+					     
+					     'COB' as [Pricing Point]
+					     
+					FROM [$(vFile)] //FROM  [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, header is 3 lines, 
+					table is [Daily Swing Report], 
+					filters(
+					Remove(Row, RowCnd(CellValue, 2, StrCnd(null))), //Keep those with fund names (inc fund level at this stage) - cuts headers/footers
+					Replace(6, top, StrCnd(null)), //Fill down swing DECISION from fund level to share class level
+					Replace(7, top, StrCnd(null)), //Fill down swing DIRECTION from fund level to share class level
+					Remove(Row, RowCnd(CellValue, 15, StrCnd(null))) //Remove the fund level stuff - any with blank share price
+					));
+																													
+		
+		//-----------------------------------------------------------------------------------------------
+		//Offshore MINT 
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*Int*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate (Data) //Data:
+			//-----------								
+								
+					LOAD FilePath() as File,
+						
+						ApplyMap('MapFundIdentifier',	[Fund Number]&' '&right([Fund Name],1)
+													,	[Fund Number]&' '&right([Fund Name],1)
+												)	as FundClass, // E.g. 291000 4
+						
+					     round(floor(100000*num(Num#([Final NAV (Class CCY)])))/100000,0.0001) as Price,
+					     
+					     FileName()&'_'&applyMap('MapFundIdentifier',[Fund Number]&' '&right([Fund Name],1)  ,  [Fund Number]&' '&right([Fund Name],1))
+					     			as PrimaryKey_File_FundClass,
+					     
+					     if(upper(Decision)='NO SWING REQUIRED', 'No Swing',
+					     				applymap('Map_SwingDirection_Rename',upper(Direction),Direction)
+					     			) as [Pricing Basis], 					     			
+					     
+					     'noon' as [Pricing Point]
+					     
+					FROM [$(vFile)] //FROM  [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, header is 3 lines, 
+					table is [Daily Swing Report], 
+					filters(
+					Remove(Row, RowCnd(CellValue, 2, StrCnd(null))), //Keep those with fund names (inc fund level at this stage) - cuts headers/footers
+					Replace(6, top, StrCnd(null)), //Fill down swing DECISION from fund level to share class level
+					Replace(7, top, StrCnd(null)), //Fill down swing DIRECTION from fund level to share class level
+					Remove(Row, RowCnd(CellValue, 15, StrCnd(null))) //Remove the fund level stuff - any with blank share price
+					));
+
+		
+		
+		
+		//-----------------------------------------------------------------------------------------------
+		//NB: Shouldn't actually reach this 'ELSE'.  The various formats of vFile covered in the IF/ELSEIF statements above
+		// 			should be the only posibilities for vFile, given the construction of CurrentFileList and hence vFile.
+		//-----------------------------------------------------------------------------------------------
+		ELSE 
+		LET vDummy = '$(vFile)';	// vDummy statement achieves nothing, just a quick script event to make the IF...THEN...ELSE...ELSEIF...ENDIF statement work
+	
+		//-----------------------------------------------------------------------------------------------
+		ENDIF;	
+		//-----------------------------------------------------------------------------------------------
+	
+	
+	
+//================================================================================================================
+ENDIF;
+//================================================================================================================
+
+Next vFile;
+
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	FILES THAT ARE NOT NEW/UPDATED (could include files that have since been deleted)
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Concatenate (Data)
+LOAD DISTINCT * //File, Price, FundClass, PrimaryKey_File_FundClass, [Pricing Point]
+FROM
+PricesHistory_Data.csv
+//[\\maj-qv01\qlikview\QlikViewDocuments\PricesHistory_Data.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq)
+where Not Exists(PrimaryKey_File_FundClass) //Where we didn't pick up the data in the stage above (i.e. ignore updated files as we pulled in the data from scratch above)
+;
+
+
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	EXPORT TO CSV
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+IF lower(vExport) = 'yes' then
+	STORE *	//File, Price, FundClass, PrimaryKey_File_FundClass
+	FROM Data INTO PricesHistory_Data.csv(txt);
+ENDIF
+
+DROP Field PrimaryKey_File_FundClass;
+
+
+///$tab Daily Prices - separate dates
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	NEW/UPDATED FILES
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Dates: //Start the table off so we can concatenate to it later on
+LOAD * INLINE [
+    File2, Date
+];
+
+
+// 	WORK THROUGH THE CURRENT FILE LIST AND PICK OUT DATA FOR THOSE FILES WHICH ARE NEW/UPDATED SINCE LAST EXECUTION
+
+// For each vFile in '2012-07-06 - Majedie06-07-12.csv','2012-07-09 - Majedie09-07-12.csv','2012-07-10 - Majedie10-07-12.csv'
+ For each vFile in $(vFileList)
+
+
+		
+//================================================================================================================
+// If the file has NOT been added/updated since last execution:
+IF 	FileTime('$(vFile)') < '$(vLastExecTime)'  THEN  	//IF 	FileTime('$(vFileLocation)'&'$(vFile)') < '$(vLastExecTime)'  THEN  	
+//================================================================================================================
+		LET vDummy = '$(vFile)'; 	// vDummy statement achieves nothing, just a quick script event to make the IF...THEN...ELSE...ENDIF statement work
+				
+//================================================================================================================
+ELSE		// If the file HAS been added/updated since last execution:
+//================================================================================================================
+	
+	
+		//-----------------------------------------------------------------------------------------------
+		//OEICs
+		//-----------------------------------------------------------------------------------------------
+		IF '$(vFile)' like '*UK Prices\Majedie??-??-??.csv' THEN
+					
+			//-----------
+			Concatenate //Dates:
+			//-----------
+
+					FIRST 1 LOAD FilePath() as File2,
+						@4 as Date	//date(date#(@4),'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, no labels, delimiter is ',', msq);
+
+		//-----------------------------------------------------------------------------------------------
+		//MIT
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\MIT??-??-??.csv' THEN
+					
+			//-----------
+			Concatenate //Dates:
+			//-----------
+
+					FIRST 1 LOAD FilePath() as File2,
+						@4 as Date	//date(date#(@4),'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, no labels, delimiter is ',', msq);
+
+		//-----------------------------------------------------------------------------------------------
+		//Onshore Global & Tortoise
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\MajedieTortoise??-??-??.csv' THEN
+				
+			//-----------
+			Concatenate //Dates:
+			//-----------
+
+					FIRST 1 LOAD FilePath() as File2,
+						@4 as Date	//date(date#(@4),'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_UK_Prices)$(vFile)]
+					(txt, codepage is 1252, no labels, delimiter is ',', msq);		
+					
+		//-----------------------------------------------------------------------------------------------
+		//EDINBURGH INVESTMENT TRUST
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*UK Prices\EIT*.csv' THEN
+				
+			//-----------
+			Concatenate //Dates:
+			//-----------
+
+					FIRST 1 LOAD FilePath() as File2,
+						PricingDate as Date	
+					FROM [$(vFile)] 
+					(txt, utf8, embedded labels, delimiter is ',', msq);		
+								
+		//-----------------------------------------------------------------------------------------------
+		//Offshore Tortoise
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\*BNYMIRLConval.xls' THEN	//'*Irish Prices\*MajedieTort*.xls' THEN		// 24-Jan-17 change filename format for Tortoise offshore prices
+			
+			//-----------
+			Concatenate  //Dates:
+			//-----------
+									
+					LOAD FilePath() as File2,
+						date(date#([Pricing Date]),'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(biff, embedded labels, 
+					header is $(if(only(@2)='Previous NAV',2,3)) lines, //4-Jan-13 edit: the format sometimes has an entry in cell E3 which changes the recognised header
+					table is [Final price sheet$], 
+					filters( Remove(Row, RowCnd(CellValue, 4, StrCnd(null))) )
+					);				
+
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore Global
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\*Prices Sheet*.xls' THEN
+			
+			//-----------
+			Concatenate  //Dates:
+			//-----------
+								
+					LOAD FilePath() as File2,
+						date(date#([Pricing Date]),'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(biff, embedded labels, header is 2 lines, filters(
+					Remove(Row, RowCnd(CellValue, 4, StrCnd(null)))
+					));		
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore UKIF and UKEF  -------- 21-Sep-15: now using the swing reports for prices instead
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*UK*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate  //Dates:
+			//-----------								
+								
+					LOAD FilePath() as File2,
+						 date([Date:],'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, filters(
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(contain, 'Majedie Offshore', not))), //Just keep the first row (headed "Majedie Offshore")
+					Transpose(), //Turn rows into columns
+					Remove(Row, Pos(Top, 1)), //Remove row 1 (was column A) - the one with "Majedie Offshore", leaving just the Date header & value in what was row 1 (now column)
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(null))) //Remove any blank "rows" (columns), i.e. other than the one with the header [Date:] or the value
+					));			
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore USEF  -------- 21-Sep-15: now using the swing reports for prices instead
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*US*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate  //Dates:
+			//-----------
+								
+					LOAD FilePath() as File2,
+						 date([Date:],'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, filters(
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(contain, 'Majedie Offshore', not))), //Just keep the first row (headed "Majedie Offshore")
+					Transpose(), //Turn rows into columns
+					Remove(Row, Pos(Top, 1)), //Remove row 1 (was column A) - the one with "Majedie Offshore", leaving just the Date header & value in what was row 1 (now column)
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(null))) //Remove any blank "rows" (columns), i.e. other than the one with the header [Date:] or the value
+					));
+
+
+		//-----------------------------------------------------------------------------------------------
+		//Offshore MINT
+		//-----------------------------------------------------------------------------------------------
+		ELSEIF '$(vFile)' like '*Irish Prices\Majedie*Int*Swing*Report*.xlsx' THEN
+			
+			//-----------
+			Concatenate  //Dates:
+			//-----------								
+								
+					LOAD FilePath() as File2,
+						 date([Date:],'DD/MM/YYYY') as Date
+					FROM [$(vFile)] //FROM [$(vFileLocation_Irish_Prices)$(vFile)]
+					(ooxml, embedded labels, filters(
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(contain, 'Majedie Offshore', not))), //Just keep the first row (headed "Majedie Offshore")
+					Transpose(), //Turn rows into columns
+					Remove(Row, Pos(Top, 1)), //Remove row 1 (was column A) - the one with "Majedie Offshore", leaving just the Date header & value in what was row 1 (now column)
+					Remove(Row, RowCnd(CellValue, 1, StrCnd(null))) //Remove any blank "rows" (columns), i.e. other than the one with the header [Date:] or the value
+					));	
+					
+		//-----------------------------------------------------------------------------------------------
+		//NB: Shouldn't actually reach this 'ELSE'.  The various formats of vFile covered in the IF/ELSEIF statements above
+		// 			should be the only posibilities for vFile, given the construction of CurrentFileList and hence vFile.
+		//-----------------------------------------------------------------------------------------------
+		ELSE 
+		LET vDummy = '$(vFile)';	// vDummy statement achieves nothing, just a quick script event to make the IF...THEN...ELSE...ELSEIF...ENDIF statement work
+	
+		//-----------------------------------------------------------------------------------------------
+		ENDIF;	
+		//-----------------------------------------------------------------------------------------------
+	
+	
+	
+//================================================================================================================
+ENDIF;
+//================================================================================================================
+
+Next vFile;
+
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	FILES THAT ARE NOT NEW/UPDATED (could include files that have since been deleted)
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Concatenate
+LOAD Distinct * //File2, Date
+FROM
+PricesHistory_Dates.csv
+//[\\maj-qv01\qlikview\QlikViewDocuments\PricesHistory_Dates.csv]
+(txt, utf8, embedded labels, delimiter is ',', msq)
+WHERE Not Exists(File2)	//Where we didn't pick up the data in the stage above (i.e. ignore updated files as we pulled in the dates from scratch above)
+;
+
+
+
+
+
+
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//	EXPORT TO CSV
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+IF lower(vExport) = 'yes' then
+	STORE *	//File2, Date
+	FROM Dates INTO PricesHistory_Dates.csv(txt)
+	;
+ENDIF
+///$tab Daily Prices - join data and dates
+Daily_Prices:
+
+NoConcatenate
+
+	LOAD DISTINCT 
+		File, 
+		Price, 
+		[Pricing Basis], //ADDED IN 05/08/2014		
+		FundClass 
+			,Yield //ADDED IN 29/10/2012
+			,[Pricing Point]  //ADDED IN 13/08/2014
+	Resident Data;
+	
+Left Join (Daily_Prices)
+
+	LOAD DISTINCT 
+		File2 as File, 
+		Date 
+	Resident Dates;
+	
+		
+	
+DROP Tables Data, Dates;
+
+
+
+
+
+
+
+Let vOffshoreSwingChangeDate = date#(42186); //1 July 2015
+
+
+Daily_Prices_TEMP:
+NoConcatenate
+LOAD File,
+	 Price, 
+	 
+		if(Date < '$(vOffshoreSwingChangeDate)' and (FundClass like 'MAJUKEQ*' or FundClass like 'USEQ*' or FundClass like 'MAJUKINC*'),
+		'NAV', [Pricing Basis]) as [Pricing Basis], //[Pricing Basis],
+		// 1-Jul-15 change to swinging price - on prev tab setting it as 'Unknown' for UKEF/UKIF/USEF offshore, 
+		// but this checks we have 'NAV' for up to 30 Jun in case of subsequent revisions/reloads
+	 
+	 FundClass,
+	 Yield,
+	 [Pricing Point],
+	 Date,
+	date#(floor(Date))&'_'&FundClass as [Date_FundClass Key],
+	date#(floor(Date))&'_'&[Pricing Point]&'_'&FundClass as [Date_Time_FundClass Key] 
+Resident Daily_Prices;
+
+DROP Table Daily_Prices;
+
+Rename Table Daily_Prices_TEMP to Daily_Prices;
+///$tab >>.>>
+///$tab History
+//************************************************************************************
+//BRINGING IN THE FULL HISTORY NOW (SEPARATE SOURCE - ALL FUNDS TOGETHER)
+// This history table will now be concatenated with the "Daily_Prices" table above
+Concatenate (Daily_Prices)
+//Prices_History:
+	LOAD date(Date,'DD/MM/YYYY') as Date, 
+	     FundClass, 
+	     Price,
+	     
+		[Pricing Basis], //History refresh 27-08-2014 took the export from this QVW so already had this Pricing Basis column calculated
+		//	     if(FundClass like 'Majedie Asset Management Tortoise Fund*' OR FundClass like 'MAJUKEQ*', 'NAV',   'Unknown') as [Pricing Basis], 
+
+		 [Pricing Point]  ,
+		 
+		 date#(floor(Date))&'_'&[Pricing Point]&'_'&FundClass as [Date_Time_FundClass Key]
+	FROM
+	[$(vFileLocation_PriceHistory)]
+	(ooxml, embedded labels, table is [history refresh 27aug2014])
+	//(ooxml, embedded labels, table is [AS IMPORTED 7 AUG 2012])
+	WHERE NOT exists(  [Date_Time_FundClass Key] ,date#(floor(Date))&'_'&[Pricing Point]&'_'&FundClass   )
+	;
+//************************************************************************************
+
+
+
+
+
+///$tab EOM price history
+//##########################################################################################
+// First get the UNSWUNG eom COB prices
+//##########################################################################################
+
+			//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+			EOM_Date_Columns:
+			//- - - - - - - - - - - - - - - - - - - 
+			LOAD @1 as EOM_Date_List
+			FROM
+			[$(vFileLocation_EOMPriceHistory)]  //[\\maj-qv01\qlikview\QlikView Development Documents\DAILY PRICES\2014 08 eom cob price history\2003 03 - 2014 07 EOM price history.xls]
+			(biff, no labels, table is [Unswung COB EOM prices$], filters(
+			Transpose(),
+			Remove(Row, Pos(Top, 2)),
+			Remove(Row, Pos(Top, 1))
+			))
+			Where not(len(@1)<2); //in case of blanks
+			//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+			
+			Let vEOMDateColumns = '';
+			LET vNumOfEOMDatesLoop = NoOfRows('EOM_Date_Columns');
+			//-------------
+			FOR c=0 TO $(vNumOfEOMDatesLoop) -1
+				LET vEOMDateValue	= Peek('EOM_Date_List',c,'EOM_Date_Columns');	
+				LET vEOMDateColumns = '$(vEOMDateColumns)' &    '['    & '$(vEOMDateValue)' &    '],'   	;
+			NEXT
+			//-------------
+			LET vEOMDateColumns = Left('$(vEOMDateColumns)', len('$(vEOMDateColumns)')-1);
+			//-------------
+			DROP Table EOM_Date_Columns;
+			//------------------------------------------------------------------------------------------
+
+
+
+	//------------------------------------------------------------------------------------------
+	//NoConcatenate (won't allow this anyway as illegal prefix combination with CrossTable)
+	Prices_EOM_History_TEMP:
+	//---------------------------------------------
+	CrossTable(Date, Price)
+	LOAD FundClass,  
+		 $(vEOMDateColumns) //Defined above - this is effectively a list of dates (column headings), which will grow as extra month-ends are added
+	FROM
+	[$(vFileLocation_EOMPriceHistory)]  //[\\maj-qv01\qlikview\QlikView Development Documents\DAILY PRICES\2014 08 eom cob price history\2003 03 - 2014 07 EOM price history.xls]
+	(biff, embedded labels, table is [Unswung COB EOM prices$], filters(
+	Remove(Col, Pos(Top, 1)),
+	Remove(Row, RowCnd(CellValue, 1, StrCnd(null)))
+	));
+	//------------------------------------------------------------------------------------------
+	
+
+
+
+
+
+//************************************************************************************
+//BRINGING IN THE EOM HISTORY NOW (SEPARATE SOURCE - ALL FUNDS TOGETHER)
+// This EOM history table will now be concatenated with the "Daily_Prices" table above
+Concatenate (Daily_Prices)
+LOAD FundClass, Price,
+	 date(date#(Date),'DD/MM/YYYY') as Date, 
+	 'Unswung Mid' as [Pricing Basis],
+	 'COB' as [Pricing Point]
+Resident Prices_EOM_History_TEMP
+WHERE NOT exists(  [Date_Time_FundClass Key] ,date#(floor(date#(Date)))&'_COB_'&FundClass   ) //E.g. Tortoise onshore will already have a EOM COB from daily prices
+;
+//**********************************
+DROP Table Prices_EOM_History_TEMP;
+//************************************************************************************
+
+
+
+
+//  20/08/2014 - Need to think about this.  Don't want to read in BNY's repported COB unswung AND then unswing the COB price ourselves (need a definitive single price definition).
+//				 The better source is BNY's number (in case our swing rates are wrong for example), but it would be a simpler script if the stuff below was just cut!  
+//				 	 	
+//			
+//			
+//			//##########################################################################################
+//			// Now get the SWUNG DOWN eom COB prices
+//			//##########################################################################################
+//			
+//						//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+//						EOM_Date_Columns:
+//						//- - - - - - - - - - - - - - - - - - - 
+//						LOAD @1 as EOM_Date_List
+//						FROM
+//						[$(vFileLocation_EOMPriceHistory)]  //[\\maj-qv01\qlikview\QlikView Development Documents\DAILY PRICES\2014 08 eom COB price history\2003 03 - 2014 07 EOM price history.xls]
+//						(biff, no labels, table is [Swung Down COB EOM prices$], filters(
+//						Transpose(),
+//						Remove(Row, Pos(Top, 2)),
+//						Remove(Row, Pos(Top, 1))
+//						))
+//						Where not(len(@1)<2); //in case of blanks
+//						//- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  
+//						
+//						Let vEOMDateColumns = '';
+//						LET vNumOfEOMDatesLoop = NoOfRows('EOM_Date_Columns');
+//						//-------------
+//						FOR c=0 TO $(vNumOfEOMDatesLoop) -1
+//							LET vEOMDateValue	= Peek('EOM_Date_List',c,'EOM_Date_Columns');	
+//							LET vEOMDateColumns = '$(vEOMDateColumns)' &    '['    & '$(vEOMDateValue)' &    '],'   	;
+//						NEXT
+//						//-------------
+//						LET vEOMDateColumns = Left('$(vEOMDateColumns)', len('$(vEOMDateColumns)')-1);
+//						//-------------
+//						DROP Table EOM_Date_Columns;
+//						//------------------------------------------------------------------------------------------
+//			
+//			
+//			
+//				//------------------------------------------------------------------------------------------
+//				//NoConcatenate (won't allow this anyway as illegal prefix combination with CrossTable)
+//				Prices_EOM_History_TEMP:
+//				//---------------------------------------------
+//				CrossTable(Date, Price)
+//				LOAD FundClass,  
+//					 $(vEOMDateColumns) //Defined above - this is effectively a list of dates (column headings), which will grow as extra month-ends are added
+//				FROM
+//				[$(vFileLocation_EOMPriceHistory)]  //[\\maj-qv01\qlikview\QlikView Development Documents\DAILY PRICES\2014 08 eom COB price history\2003 03 - 2014 07 EOM price history.xls]
+//				(biff, embedded labels, table is [Swung Down COB EOM prices$], filters(
+//				Remove(Col, Pos(Top, 1)),
+//				Remove(Row, RowCnd(CellValue, 1, StrCnd(null)))
+//				));
+//				//------------------------------------------------------------------------------------------
+//				
+//			
+//			
+//			
+//			
+//			
+//			//************************************************************************************
+//			//BRINGING IN THE EOM HISTORY NOW (SEPARATE SOURCE - ALL FUNDS TOGETHER)
+//			// This EOM history table will now be concatenated with the "Daily_Prices" table above
+//			Concatenate (Daily_Prices)
+//			LOAD FundClass, Price,
+//				 date(date#(Date),'DD/MM/YYYY') as Date, 
+//				 'Swung Down EOM' as [Pricing Basis],
+//				 'COB' as [Pricing Point]
+//			Resident Prices_EOM_History_TEMP
+//			WHERE NOT exists(  [Date_Time_FundClass Key] ,date#(floor(date#(Date)))&'_COB_'&FundClass   )
+//			;
+//			//**********************************
+//			DROP Table Prices_EOM_History_TEMP;
+//			//************************************************************************************
+//			
+//			
+//			
+//			
+///$tab >>>
+///$tab Fund identifiers etc
+NoConcatenate
+Fund_identifiers:
+LOAD FundClass, 
+     Fund, 
+     [Share Class], 
+     Sedol, 
+     ISIN,
+     [Inc Acc], //ADDED 29/01/2015 
+     Currency,
+     FundCode //will be used to join to swing rates later
+FROM
+[$(vFileLocation_FundIdentifiers)]
+(biff, embedded labels, table is Sheet1$);
+
+
+
+
+//-------------------------------------------
+//  Now join the identifier info into the data table
+//-------------------------------------------
+NoConcatenate
+Prices_temp:
+Load * Resident Daily_Prices;
+	
+Left Join (Prices_temp) //via FundClass
+Load * Resident Fund_identifiers;
+
+DROP Tables Daily_Prices, Fund_identifiers;
+
+
+
+
+//-------------------------------------------
+//  Now tidy up the prices/currencies so everything is in major units, e.g. 1.0175 GBP rather than 101.75 GB Pence)
+//-------------------------------------------
+NoConcatenate
+Prices_final:
+LOAD //#Date__FundClass__Price,
+	Date,
+	FundClass,
+	if(Currency='GB Pence' OR Currency='USD Cent' OR Currency='EUR Cent',Price/100,Price) as Price,
+	Fund,
+	[Share Class],
+	Sedol,
+	ISIN,
+	if(Currency='GB Pence','GBP', if(Currency='USD Cent', 'USD', if(Currency='EUR Cent', 'EUR', Currency))) as Currency
+		,Yield //ADDED IN 29/10/2012,
+		,[Inc Acc] //ADDED 29/01/2015 
+    	,FundCode //ADDED IN 04/08/2014
+    	,[Pricing Basis] //ADDED IN 05/08/2014
+		,[Pricing Point]  //ADDED IN 13/08/2014
+Resident Prices_temp
+WHERE not isnull(Price);
+
+DROP Table Prices_temp;
+
+
+
+
+
+
+//-------------------------------------------
+Domicile:
+//-------------------------------------------
+LOAD * INLINE [
+    Fund, Domicile
+    Global Equity, Onshore
+    Global Focus, Onshore
+    UK Smaller Companies, Onshore
+    OLD Global Focus offshore, Offshore
+    OLD Global Focus onshore, Offshore
+    Tortoise offshore, Offshore
+    Tortoise onshore, Onshore
+    UK Equity MIT, Onshore
+    UK Equity offshore, Offshore
+    UK Equity onshore, Onshore
+    UK Focus, Onshore
+    UK Income onshore, Onshore
+    UK Income offshore, Offshore
+    UK Opportunities, Onshore
+    US Equity, Offshore
+];
+///$tab >>>>
+///$tab Dividends
+
+//----------------------------------------------------------------------
+NoConcatenate
+Dividends_temp1:
+LOAD date([XD Date],'DD/MM/YYYY') as [XD Date], 
+
+	//*****
+	date([XD Date],'DD/MM/YYYY') as Date, 
+	//*****
+	
+     date([Pay Date],'DD/MM/YYYY') as [Pay Date], 
+     Sedol, 
+
+     //[Fund Name], 
+     //[Share Class Name], 
+     //[Share Class Number], 
+     //[Interest / Dividend], 
+
+	//	Currency,
+		[Distribution Rate - Gross], 
+		[Distribution Rate - Net]
+
+
+FROM
+[$(vFileLocation_DividendHistory)]
+//[Daily prices - all funds - SA TEST\SOURCE - historical dividend rates.xlsx]
+(ooxml, embedded labels, header is 1 lines, table is Dividends, filters(
+Remove(Row, RowCnd(Compound,
+	RowCnd(CellValue, 8, StrCnd(null)),
+	RowCnd(CellValue, 9, StrCnd(null))
+))
+));
+//----------------------------------------------------------------------
+
+
+
+NoConcatenate
+Fund_identifiers_2:
+LOAD 
+	FundClass, 
+//	if(
+//		len(applymap('mapLinkSterlingFix', lower(FundClass), null())) > 1,
+//		100,
+//		1
+//	) as DividendsMultiplier,
+	if(
+		len(applymap('mapLinkSterlingFix', lower(FundClass), null())) > 1,
+		100,
+		if(
+			Sedol = '0305233_MKT',
+			100,
+			1
+		)
+	) as DividendsMultiplier,  
+	Fund,
+	[FundClass 2],
+	[Share Class], 
+	Sedol, 
+	ISIN,
+	Currency
+FROM
+[$(vFileLocation_FundIdentifiers)]
+//[Daily prices - all funds - SA TEST\SOURCE - Fund identifiers.xls]
+(biff, embedded labels, table is Sheet1$)
+where lower(Active) = 'yes'
+;
+
+
+//-------------------------------------------
+//  Now join the identifier info into the data table
+//-------------------------------------------
+NoConcatenate
+Dividends_temp2:
+Load * Resident Dividends_temp1;
+
+Left Join (Dividends_temp2)
+Load * Resident Fund_identifiers_2;
+
+DROP Tables Dividends_temp1, Fund_identifiers_2;
+
+
+
+
+//-------------------------------------------
+//  Now tidy up the prices/currencies so everything is in major units, e.g. 1.0175 GBP rather than 101.75 GB Pence)
+//-------------------------------------------
+NoConcatenate
+Dividends:
+LOAD Date,
+	[XD Date],
+	[Pay Date],
+	FundClass,	
+	[FundClass 2],	
+	if(
+		Currency='GB Pence' OR Currency='USD Cent' OR Currency='EUR Cent',
+		[Distribution Rate - Gross] / 100,
+		[Distribution Rate - Gross] / DividendsMultiplier
+	) as [Distribution Rate - Gross],
+	if(
+		Currency='GB Pence' OR Currency='USD Cent' OR Currency='EUR Cent',
+		[Distribution Rate - Net] / 100,
+		[Distribution Rate - Net] / DividendsMultiplier
+	) as [Distribution Rate - Net],
+	Fund,
+	[Share Class],
+	Sedol,
+	ISIN,
+	if(Currency='GB Pence','GBP', if(Currency='USD Cent', 'USD', if(Currency='EUR Cent', 'EUR', Currency))) as Currency
+Resident Dividends_temp2;
+
+DROP Table Dividends_temp2;
+
+///$tab Export Dividends to CSV
+//***************************************************************************
+//	Temporarily make a relative filepath whilst editing script
+//***************************************************************************
+
+
+IF lower(vExport) = 'yes' then
+	STORE 
+		[XD Date], 
+		[Pay Date],
+		[Distribution Rate - Gross],
+		[Distribution Rate - Net],
+		Fund,
+		[Share Class], 
+		Sedol, 
+		ISIN,
+		Currency
+	FROM Dividends 
+	INTO $(vExportFile_Dividends) (txt);
+ENDIF
+///$tab >>>>.>
+///$tab Swing Rates
+//--------------------------------------------------------------------------------------
+NoConcatenate
+SwingRates:
+//-------------------------------------------
+LOAD [ACTIVE Date] as [Date SWING RATE],
+     //[FROM Date], 
+     //[TO Date], 
+     
+     [Fund Code] as [FundCode SWING RATE], 
+     //[Fund Name],
+      
+     [Bid Spread], 
+     	num((1-[Bid Spread]),'#0.0000') as [Bid MULTIPLIER], //e.g. 0.75% becomes 0.9925
+     [Offer Spread], 
+     	num((1+[Offer Spread]),'#0.00%') as [Offer MULTIPLIER] //e.g. 0.90% becomes 1.009
+FROM
+[$(vFile_SwingRateHistory)]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+//--------------------------------------------------------------------------------------
+
+
+///$tab >>>>>
+
+
+///$tab Join Prices-Dividends-Swings
+//--------------------------------------------------------------------------------------
+NoConcatenate
+Prices_and_Dividends_temp:
+//-------------------------------------------
+	Load DISTINCT *,
+		 FundCode&' - '&date#(floor(Date)) as [% FundCode Date KEY] 
+	Resident Prices_final;
+// . . . . . . . . . . . . . . . . . . . . . . 
+LEFT JOIN (Prices_and_Dividends_temp) //via [% FundCode Date KEY] 
+// . . . . . . . . . . . . . . . . . . . . . . 
+	Load DISTINCT *,
+		 [FundCode SWING RATE]&' - '&date#(floor([Date SWING RATE])) as [% FundCode Date KEY] 
+	Resident SwingRates;
+// . . . . . . . . . . . . . . . . . . . . . . 
+Join (Prices_and_Dividends_temp) //via Date, FundClass, Fund, [Share Class], Sedol, ISIN, Currency
+// . . . . . . . . . . . . . . . . . . . . . . 
+	Load DISTINCT * 
+	Resident Dividends;
+//-------------------------------------------
+DROP Tables Prices_final, SwingRates, Dividends;
+//-------------------------------------------
+DROP Field [% FundCode Date KEY] ;
+//--------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+//--------------------------------------------------------------------------------------
+NoConcatenate
+Prices_and_Dividends:
+//-------------------------------------------
+LOAD FundClass,
+	 Fund,
+	 [Share Class],
+	 Sedol,
+	 ISIN,
+	 Currency,
+		[Pricing Point],  //ADDED IN 13/08/2014
+
+	 //Price DO THIS BELOW WITH MORE CALCS
+	 Yield,
+
+	 [XD Date],
+	 [Pay Date],
+	 [Distribution Rate - Gross],
+	 [Distribution Rate - Net],
+	 
+
+	Date,
+	day(Date) as Day,
+	month(Date) as Month,
+	year(Date) as Year,
+	month(Date)&'-'&right(year(Date),2) as MonthYear,
+	MonthEnd(Date)	as	MonthEnd,
+
+
+
+	
+	if([Pricing Basis]='Swung Up', 				Price/[Offer MULTIPLIER],
+	if([Pricing Basis]='Swung Down', 			Price/[Bid MULTIPLIER],
+	if([Pricing Basis]='Swung Down EOM', 		Price/[Bid MULTIPLIER], //for the EOM swung down prices
+	if([Pricing Basis]='No Swing',				Price, 
+	if([Pricing Basis]='Unswung Mid',			Price, //for the EOM unswung prices
+	if([Pricing Basis]='NAV',					Price,
+	if([Pricing Basis]='Unknown',				null()
+	)))))))	as [Price - Unswung Mid],
+	
+	if([Pricing Basis]='Swung Up', 				(Price/[Offer MULTIPLIER])*[Bid MULTIPLIER],
+	if([Pricing Basis]='Swung Down', 			Price,
+	if([Pricing Basis]='Swung Down EOM',		Price, //for the EOM swung down prices
+	if([Pricing Basis]='No Swing',				Price*[Bid MULTIPLIER],
+	if([Pricing Basis]='Unswung Mid',			Price*[Bid MULTIPLIER],  //for the EOM unswung prices
+	if([Pricing Basis]='NAV',					null(),	//Price,	//2-Jan-19 changed to null (so that e.g. we don't see "bid" prices for Tortoise offshore which is single-priced so "bid" can be confusing)
+	if([Pricing Basis]='Unknown',				null()
+	)))))))	as [Price - Swung Down Bid],
+	
+	if([Pricing Basis]='Swung Up', 				Price,
+	if([Pricing Basis]='Swung Down', 			(Price/[Bid MULTIPLIER])*[Offer MULTIPLIER], //for the EOM swung down prices
+	if([Pricing Basis]='Swung Down EOM',		(Price/[Bid MULTIPLIER])*[Offer MULTIPLIER],
+	if([Pricing Basis]='No Swing',				Price*[Offer MULTIPLIER],
+	if([Pricing Basis]='Unswung Mid',			Price*[Offer MULTIPLIER],  //for the EOM unswung prices
+	if([Pricing Basis]='NAV',					null(),	//Price,	//2-Jan-19 changed to null (so that e.g. we don't see "bid" prices for Tortoise offshore which is single-priced so "bid" can be confusing)
+	if([Pricing Basis]='Unknown',				null()
+	)))))))	as [Price - Swung Up Offer],
+	
+
+	if([Pricing Basis]='NAV', Price,	null()	)	
+			as [Price - NAV],
+
+	if([Pricing Basis]='Unswung Mid' OR [Pricing Basis]='Swung Down EOM',null(),Price) 
+			as [Price - Dealt], //No dealing for EOM price points
+	
+	Price, //as Price (DUPE)
+	[Pricing Basis],
+	text(num([Bid Spread],'##0.####')) as [Bid Spread], //Better to have 0.01 than 1.00% in the exported CSV for the database
+	text(num([Offer Spread],'##0.####')) as [Offer Spread] //Better to have 0.01 than 1.00% in the exported CSV for the database
+	,[Inc Acc] //ADDED 29/01/2015 
+	
+Resident Prices_and_Dividends_temp;
+//-------------------------------------------
+DROP Table Prices_and_Dividends_temp;
+//--------------------------------------------------------------------------------------
+
+///$tab ROUNDING
+//--------------------------------------------------------------------------------------
+NoConcatenate
+Prices_and_Dividends_ROUNDED:
+//-------------------------------------------
+LOAD FundClass,
+	 Fund,
+	 [Share Class],
+	 Sedol,
+	 ISIN,
+	 Currency,
+	[Pricing Point],  
+
+	 Yield,
+
+	 [XD Date],
+	 [Pay Date],
+	 [Distribution Rate - Gross],
+	 [Distribution Rate - Net], 
+
+	Date,
+	Day,
+	Month,
+	Year,
+	MonthYear,
+	MonthEnd,
+	
+
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price - Unswung Mid])))/10000000,0.000001),			// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price - Unswung Mid])))/10000000,0.0001))				// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Unswung Mid],10000000)),												// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Unswung Mid],100000)))													// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price - Unswung Mid],	
+	
+//	if(upper(Fund) = 'TORTOISE OFFSHORE',	round([Price - Unswung Mid]		,0.000001),
+//											round([Price - Unswung Mid]		,0.0001)  )
+//		as [Price - Unswung Mid],	
+//		
+		
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price - Swung Down Bid])))/10000000,0.000001),			// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price - Swung Down Bid])))/10000000,0.0001))			// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Swung Down Bid],10000000)),												// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Swung Down Bid],100000)))												// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price - Swung Down Bid],
+			
+			
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price - Swung Up Offer])))/10000000,0.000001),			// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price - Swung Up Offer])))/10000000,0.0001))			// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Swung Up Offer],10000000)),												// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Swung Up Offer],100000)))												// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price - Swung Up Offer],
+			
+			
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price - NAV])))/10000000,0.000001),				// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price - NAV])))/10000000,0.0001))					// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - NAV],10000000)),														// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - NAV],100000)))															// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price - NAV],
+			
+			
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price - Dealt])))/10000000,0.000001),				// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price - Dealt])))/10000000,0.0001))				// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Dealt],10000000)),													// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price - Dealt],100000)))													// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price - Dealt],
+		
+		
+			
+			
+	if(upper(Fund) = 'TORTOISE OFFSHORE',	//round(floor(10000000*num(Num#([Price])))/10000000,0.000001),						// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											//round(floor(10000000*num(Num#([Price])))/10000000,0.0001))						// * * * * * * SD: 26 Oct 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price],10000000)),															// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+											$(vMyRound([Price],100000)))															// * * * * * * SD: 22 Nov 2016 edit - To resolve the issue with rounding
+		as [Price],
+	
+	
+	
+	[Pricing Basis],
+	[Bid Spread],
+	[Offer Spread], 
+	[Inc Acc]
+	
+Resident Prices_and_Dividends;
+//-------------------------------------------
+DROP Table Prices_and_Dividends;
+Rename Table Prices_and_Dividends_ROUNDED to Prices_and_Dividends;
+//-------------------------------------------
+
+///$tab >>>>>>>>
+///$tab Export Prices with Swings
+NoConcatenate
+TEMP_FOR_EXPORT:
+LOAD DISTINCT 
+		Date,
+		Fund,
+		[Share Class], 
+		Sedol, 
+		ISIN,
+		Currency,
+		[Pricing Basis],
+		[Pricing Point], 
+		[Price - Dealt],
+		[Bid Spread],
+		[Offer Spread],
+		[Price - Unswung Mid],
+		[Price - Swung Down Bid],
+		[Price - Swung Up Offer],
+		[Price - NAV] 
+Resident Prices_and_Dividends
+WHERE not isnull(Price) //Strips out rows which are just dividends
+and not(Date='Dummy');
+
+QUALIFY *;
+a:
+load * Resident TEMP_FOR_EXPORT;
+UNQUALIFY *;
+
+	
+IF lower(vExport) = 'yes' then
+
+		STORE
+			Date, 
+			Fund,
+			[Share Class], 
+			Sedol, 
+			ISIN,
+			Currency,
+			//Price, //same as [Price - Dealt]
+			[Pricing Basis],
+				[Pricing Point],  //ADDED IN 13/08/2014
+			[Price - Dealt],
+			[Bid Spread],
+			[Offer Spread],
+			[Price - Unswung Mid],
+			[Price - Swung Down Bid],
+			[Price - Swung Up Offer],
+			[Price - NAV] 
+		FROM TEMP_FOR_EXPORT 
+		INTO $(vExportFile_Prices_with_Swings) (txt);
+		
+		
+		STORE
+			Date, 
+			Fund,
+			[Share Class], 
+			Sedol, 
+			ISIN,
+			Currency,
+			//Price, //same as [Price - Dealt]
+			[Pricing Basis],
+				[Pricing Point],  //ADDED IN 13/08/2014
+			[Price - Dealt],
+			[Bid Spread],
+			[Offer Spread],
+			[Price - Unswung Mid],
+			[Price - Swung Down Bid],
+			[Price - Swung Up Offer],
+			[Price - NAV] 
+		FROM TEMP_FOR_EXPORT 
+		INTO $(vExportFile_Prices_with_SwingsCOPY) (txt);
+
+	
+	
+	
+	
+	// Export a file for daily website load.
+	
+	// Removed B4JQ4Y8 21/01/2020
+			
+		Map_LiveSedol: // This list will need updating as and when we add/remove share classes
+		mapping LOAD *, 1 as F2 INLINE [
+	    F1
+	    3273069
+	    B88NK73
+	    B8BH0R2
+	    BBT3J65
+	    3354737
+	    B7S3QT0
+	    B845051
+	    B83QP49
+	    B7XCNP7
+	    3397572
+	    3397583
+	    B6Q8SG1
+	    B79FF32
+	    B7M54C1
+	    B240WY7
+	    B240WZ8
+	    B3CQKZ1
+	    B4MNRG9
+	    B4JQ460
+	    
+	    B51FHZ2
+	    B3R27F3
+	    B3W6GN1
+	    BG49LD4
+	    BG49LB2
+	    BG49LC3
+	    BD3DX29
+	    BF0B342
+	    BH65MY5
+	    BH65MZ6
+	    BW0DL87
+	    BD7YFT9
+	    BD6L0G3
+	    BNGWXX4
+	    BNGWXW3
+	    BNGWXZ6
+	    BNGWXY5
+	    BYMLZX6
+	    BNGWY19
+	    BNGWY08
+	    BN31T92
+	    BN31TB4
+	    BN31TC5
+	    BN31TD6
+	    BN31TH0
+	    BN31TJ2
+	    BN31TK3
+	    BN31TL4
+	    BSTLNK0
+	    BSTLNL1
+	    BHL3716
+	    BKY59Z8
+		BKY5B07
+	];
+	
+	
+		map_Swing:
+		Mapping load * INLINE [
+	    F1, F2
+	    No Swing, none
+	    Swung Down, down
+	    NAV, na
+	    Swung Up, up
+		];
+	
+	
+		//qualify *;	
+		TEMP_FOR_EXPORT2:
+		Load
+			Sedol,
+			FirstSortedValue([Price - Dealt],-Date) as Nav,
+			Date(FirstSortedValue(Date,-Date),'YYYYMMDD') as Navdate,  
+			Applymap('map_Swing', FirstSortedValue([Pricing Basis],-Date)  ) as [Pricing Basis]
+			Resident TEMP_FOR_EXPORT
+		where ApplyMap ('Map_LiveSedol', Sedol, 0) > 0
+		Group by Sedol
+		;
+		
+		//UNQUALIFY *;
+		
+		STORE
+			[Sedol], 
+			[Nav],
+			[Navdate], 
+			[Pricing Basis] as [Price Swing *]
+		FROM TEMP_FOR_EXPORT2 
+		INTO [$(vExportFile_DailyPrices)] (txt);
+	
+	DROP Table TEMP_FOR_EXPORT2;
+	ENDIF			
+
+DROP Table TEMP_FOR_EXPORT;
+
+
+///$tab Export UKSC mid prices
+// UKSC mid prices are used as 'arrival prices' to calculate implicit transaction costs for portfolios buying or selling UKSC
+
+
+
+//-------------------------------------------
+NoConcatenate
+TEMP_FOR_EXPORT_UKSC:
+//-------------------------------------------
+LOAD DISTINCT 
+		Date, 
+		Fund,
+		[Share Class], 
+		Sedol, 
+		[Pricing Basis] as SwingFlag,
+		[Price - Dealt] as ExecutionPrice,
+		[Price - Unswung Mid] as MidPrice
+Resident Prices_and_Dividends
+WHERE not isnull(Price) //Strips out rows which are just dividends
+and not(Date='Dummy')
+and Sedol='3397583' // UKSC class B
+and not(isnull([Price - Dealt])) // e.g. non-dealing COB prices
+and not(isnull([Price - Unswung Mid])) // as this field is what we want to use this file for!
+;
+
+
+//-------------------------------------------
+IF lower(vExport) = 'yes' then
+	STORE * 
+	FROM TEMP_FOR_EXPORT_UKSC 
+	INTO $(vExportFile_UKSCmidprices) (txt);
+ENDIF
+
+
+//-------------------------------------------
+Drop Table TEMP_FOR_EXPORT_UKSC;
+///$tab >>>>>>
+///$tab FINISH
+
+//==============================================
+If ScriptErrorCount = 0 then
+
+	Let vLastExecTime = vThisExecTime;
+
+End If
+//==============================================
+
+
