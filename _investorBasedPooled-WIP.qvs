@@ -1,0 +1,500 @@
+﻿///$tab Main
+//	-------------------------------------------------------------------
+//	DEFAULT QLIKVIEW VARIABLES
+//	-------------------------------------------------------------------
+
+	SET ThousandSep=',';
+	SET DecimalSep='.';
+	SET MoneyThousandSep=',';
+	SET MoneyDecimalSep='.';
+	SET MoneyFormat='£#,##0.00;-£#,##0.00';
+	SET TimeFormat='hh:mm:ss';
+	SET DateFormat='DD/MM/YYYY';
+	SET TimestampFormat='DD/MM/YYYY hh:mm:ss[.fff]';
+	SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+	SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';	
+
+//	-------------------------------------------------------------------
+//	LOAD CONFIG FILE
+//	-------------------------------------------------------------------
+//	+ cfg.Salesforce.connection
+
+	$(Include=\\maj-qv\Qlikview\QlikViewDocuments\__qvw_config__.qvs);
+	
+//	-------------------------------------------------------------------
+
+	set vPerformanceDefaultIds = [\\maj-qv\Qlikview\QlikViewDocuments\Datasources\NetOfFees\nofPerformanceDefaultNetGrossID.csv];
+
+///$tab Maps
+// Chris Simmons updates a spreadsheet with SF entity types and ekligibility for his FSCS reporting.
+
+map_FSCS:
+Mapping LOAD Distinct 
+	lower(EntityType_SalesForce) as _Key, 
+    [Eligible Claimant]
+FROM
+[\\MAJ-QV\Qlikview\QlikViewDocuments\Datasources\Mappings\MAP - FSCS Eligibitlity Criteria.xlsx]
+(ooxml, embedded labels);
+
+//-> MAPPING TABLE: mapPerformanceDefaultID:
+mapPerformanceDefaultID:
+mapping load distinct
+	PerformanceIDCodified, 
+	1
+FROM [$(vPerformanceDefaultIds)]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+///$tab Fund Info
+//	-------------------------------------------------------------------
+//	TABLE: FundInfo
+//	-------------------------------------------------------------------
+
+	FundInfo:
+	LOAD 
+		//FundClass, 
+		//FundCode, 
+		//[FA code], 
+		Fund, 
+		[Share Class], 
+		Sedol,
+		Active,
+		ISIN
+		//Currency, 
+		//[Currency MAJOR], 
+		//[Inc Acc], 
+		//ReportingAccountNumber, 
+		//[FundClass 2]
+	FROM [\\maj-file01\majedie\Operations\QV source - prices and dividends\SOURCE - Fund identifiers.csv]
+	(txt, utf8, embedded labels, delimiter is ',', msq);
+
+//	-------------------------------------------------------------------
+///$tab SalesForce
+//	-------------------------------------------------------------------
+//	SALESFORCE CONNECTOR STRING
+//	-------------------------------------------------------------------
+
+	//CUSTOM CONNECT TO "Provider=SalesForceDLL.dll;F26;XUserId=aFZAfWFMUDdQWSdOOZcaWUROIDQaWQJNFDZSWSFMTbcKGaZFDbbaWbD;XPassword=UTOGEGdNODZeGXBGRJOIVKFJYLZMTRJNDTZOVCVOWSbEURVMGLZCFaUNMCeA;";
+	//CUSTOM CONNECT TO "Provider=QvSalesforceConnector.exe;BatchSize=500;UseBulkAPI=true;Url=https://login.salesforce.com/services/Soap/u/29.0;QueryMode=Query;ConvertSqlDates=False;BooleanAsStrings=False;ConvertToLocalTime=False;XUserId=OSPObWFMUDdQWSdOOZcaWUROIDQaWQJNFDZSWSFMTbcKGaZFDbbaGWA;XPassword=OGHXKGdNODZeGXBGRJOIVKFJYLZMTRJNDTZOVCVOWSbEURVMGLZCFaUNMCHB;";
+	//CUSTOM CONNECT TO "Provider=QvSalesforceConnector.exe;BatchSize=500;UseBulkAPI=true;Url=https://login.salesforce.com/services/Soap/u/29.0;QueryMode=Query;ConvertSqlDates=False;BooleanAsStrings=False;ConvertToLocalTime=False;XUserId=fHJWfZFMMDbSHXYMPTcIGAVNBTaKGSFNFTLGWXVNYE;XPassword=fdASQAdKBDbWWfEGODVQWZAKBTcWWfcGLSZaUZIOIKaATIJKQKNOUbUISLdIVZUKQRZKWMC;";
+	
+	CUSTOM CONNECT TO "$(cfg.Salesforce.connection)";
+	
+	//CUSTOM CONNECT TO "Provider=QvSalesforceConnector.exe;mode=BULK;timeout=100;batchSize=500;plainQueriesOnly=true;pkChunking=false;chunkSize=100000;threadCount=2;ProxyAuthentication=0;XUserId=ecbEfZFMMDbSHXYMPTcIGAVNBTaKGSFNFTLGWXVNZD;XPassword=WdaQDYFMTbcOXXJOELJETSEGTSRAXQNOTbdeGZRMFRMCULFMMbaeTYYNUCaGDIFMSbaeTSEGTTZIXXNNFTbKCZcGLSZaUZIOIKaATIJKQKNOUbUISLdIVZUKQRZKWSEGQSceGcFPQKYGXZVESJJCTGA;";
+
+
+//	-------------------------------------------------------------------
+//	MAP: Map_AccountID_Name
+//	-------------------------------------------------------------------
+
+	Map_AccountID_Name:
+	Mapping 
+	SQL SELECT 
+	    Id,
+	    Name
+	FROM Account;
+
+
+//	-------------------------------------------------------------------
+//	TABLE: SalesForce_Mandates
+//	-------------------------------------------------------------------
+
+	SalesForce_Mandates:
+	LOAD 
+		Name as Mandate_SalesForce, 
+		Account__c as AccountID_SalesForce,
+		Mandate_name__c as Mandate_Description,
+		Termination_Risk__c as Mandate_TerminationRisk,
+		Reason_for_possible_termination__c as Mandate_TerminationReason,
+		Termination_risk_comments__c as Mandate_TerminationComments,
+		Date_of_Departure2__c as Mandate_TerminationDateExpected
+		;
+	SQL SELECT Account__c,
+	    Name,
+	    Mandate_name__c,
+	    Termination_Risk__c,
+	    Reason_for_possible_termination__c,
+	    Termination_risk_comments__c,
+	    Date_of_Departure2__c
+	FROM Mandates__c;
+
+//	-------------------------------------------------------------------
+//	TABLE: SalesForce_Accounts
+//	-------------------------------------------------------------------
+
+	SalesForce_Accounts:
+	LOAD 
+		Entity_Type__c as EntityType_SalesForce,
+		ApplyMap('map_FSCS',lower(Entity_Type__c), 'Not in CS SS') as FSCS_Eligible,
+		Name as Account_SalesForce,
+		Id as AccountID_SalesForce,
+		BillingCountry as Country_of_Account_SalesForce,
+		Relationship_Quality__c as Account_RelationshipQuality,
+		ParentId as Account_ParentID,
+		applymap('Map_AccountID_Name',ParentId,null()) as Account_ParentName,
+		Consultant__c as	Account_Consultant
+			;
+	SQL SELECT Entity_Type__c,
+	    Name,
+	    Id,
+	    BillingCountry,
+	    Relationship_Quality__c,
+	    ParentId,
+	    Consultant__c
+	FROM Account;
+
+//	-------------------------------------------------------------------
+//	TABLE: Mandate_Registration_fromSFDC
+//	-------------------------------------------------------------------
+//	25-Apr-16 mandate/registration/pricing changed to come from SFDC 
+//	not DB (more up to date - DB reads from SFDC each night).
+
+	Mandate_Registration_fromSFDC: 
+	LOAD DISTINCT	
+		Mandate_Name__c as Mandate_SalesForce_TEMP,
+		upper(Unique_Designation__c) as UniqueDesignation_TEMP,
+		Notes__c as Notes_for_mapping_TEMP
+		;
+	SELECT Mandate_Name__c, 
+		Unique_Designation__c ,
+		Notes__c
+	FROM Registration__c;
+
+//	-------------------------------------------------------------------
+//	LEFT JOIN: Mandate_Registration_fromSFDC
+//	-------------------------------------------------------------------
+
+	left join (Mandate_Registration_fromSFDC) // via Mandate_SalesForce_TEMP
+	LOAD DISTINCT
+		Name as Mandate_SalesForce_TEMP,
+		Pricing_Point_for_Reporting__c as TimePoint_TEMP, 
+		Pricing_Basis_for_Reporting__c as PricingBasis_TEMP
+		;
+	SELECT Name, 
+		Pricing_Point_for_Reporting__c, 
+		Pricing_Basis_for_Reporting__c 
+	FROM Mandates__c;
+
+//	-------------------------------------------------------------------
+///$tab Database
+//	-------------------------------------------------------------------
+//	DATABASE CONNECTION STRING
+//	-------------------------------------------------------------------
+
+	OLEDB CONNECT TO [Provider=SQLOLEDB.1;Persist Security Info=True;User ID=svc_qv;Initial Catalog=MajData;Data Source=MAJSQLCLUSTER2\MSSQLSERVER2;Use Procedure for Prepare=1;Auto Translate=True;Packet Size=4096;Workstation ID=MAMW8-SARAHH;Use Encryption for Data=False;Tag with column collation when possible=False] (XPassword is VFMVaIRNRZaMXYUMXLIYA);
+
+//	-------------------------------------------------------------------
+//	TABLE: RegisterClient
+//	-------------------------------------------------------------------
+
+	RegisterClient:
+	LOAD ClientCode, Designation, DisplayName, PortfolioNo,
+		upper(UniqueDesignation) as UniqueDesignation;
+	SQL SELECT ClientCode,
+	    Designation,
+	    DisplayName,
+	    PortfolioNo,
+	    UniqueDesignation
+	FROM MajData.dbo.RegisterClient;
+
+//	-------------------------------------------------------------------
+//	TABLE: Mandates
+//	-------------------------------------------------------------------
+
+	Mandates:
+	LOAD Mandate_SalesForce_TEMP as Mandate_SalesForce,
+		upper(UniqueDesignation_TEMP) as UniqueDesignation,
+		Notes_for_mapping_TEMP as Notes_for_mapping
+	Resident Mandate_Registration_fromSFDC;
+
+
+//	-------------------------------------------------------------------
+//	TABLE: Map_UNKNOWN_Mandates
+//	-------------------------------------------------------------------
+
+	Map_UNKNOWN_Mandates:
+	Mapping LOAD DISTINCT 
+		upper(UniqueDesignation_TEMP) as UniqueDesignation,
+		1 as IsUnknown
+	Resident Mandate_Registration_fromSFDC
+	WHERE Mandate_SalesForce_TEMP='0001';// only the unknown ones
+
+
+//	-------------------------------------------------------------------
+//	TABLE: MAP_Mandate_PricingBasis
+//	-------------------------------------------------------------------
+
+	MAP_Mandate_PricingBasis:
+	Mapping LOAD DISTINCT
+		upper(UniqueDesignation_TEMP) as UniqueDesignation,
+		
+		if(Mandate_SalesForce_TEMP='0001', 							'MIXED===DEALT',
+		if(isnull(TimePoint_TEMP) and isnull(PricingBasis_TEMP),	 null(),
+														upper(TimePoint_TEMP&'==='&PricingBasis_TEMP)
+						)) as Basis_KEY
+	Resident Mandate_Registration_fromSFDC;
+	
+
+//	-------------------------------------------------------------------
+//	TABLE: QE Dates
+//	-------------------------------------------------------------------
+
+	// Fetch that last 5 quarter end dates for Chris Simmons FSCS sheet
+	QEDates:
+	Load * inline [
+	_Dummy
+	];
+	
+	
+	For i = 1 to 8
+	
+		 let vdel = Floor(QuarterEnd(today(), -$(i)));
+		 trace date : $(vdel);
+		Concatenate(QEDates)
+		load 
+			Floor(QuarterEnd(today(), -$(i))) as QEKey
+		AutoGenerate(1);	
+	Next i
+	
+	MapQEDates:
+	Mapping load 
+		QEKey,
+		1 as _Value
+	resident QEDates;
+	
+	
+	
+	drop Field _Dummy;
+		
+
+//	-------------------------------------------------------------------
+//	TABLE: PooledValuations
+//	-------------------------------------------------------------------
+
+
+	PooledValuations:
+	LOAD 
+		AsOfDate,
+		IF(
+			floor(MonthEnd(AsOfDate, 0)) = floor(AsOfDate), 
+			1,
+			0
+		) as AsofDate_EOM,	
+		
+		If(
+			ApplyMap('MapQEDates', floor(AsOfDate), 0) = 1,
+			1,
+			0
+		) as AsofDate_EOQ,
+		
+	    AsOfTime,
+	    Currency as Currency_PooledVals,
+	    GBPPrice,
+	    GBPValuation,
+	    LocalPrice,
+	    LocalValuation,
+	    PricingBasis,
+	    
+	    if(
+	    	applymap('Map_UNKNOWN_Mandates',upper(UniqueDesignation),0)=1 and upper(PricingBasis)='DEALT', 
+	    	'Yes', // For 0001 unknown mandates, use dealt price regardless of time point (will be one dealing price per day)
+	    	if(
+	    		applymap('MAP_Mandate_PricingBasis',upper(UniqueDesignation),null())= upper(AsOfTime&'==='&PricingBasis), 
+	    		'Yes', 
+	    		'No'
+	    	) 
+	    )as PricingBasis_Use_Chosen,
+	    			 
+	    applymap('MAP_Mandate_PricingBasis',upper(UniqueDesignation),null()) as PricingBasis_Chosen,
+	    
+	    upper(AsOfTime&'==='&PricingBasis) as AsOfTime_PricingBasis, // 31-7-17 addition for Andy B
+	    
+	    QuantityHeld,
+	    RegisterKey,
+	    upper(Sedol&'==='&UniqueDesignation) as SedolUD_KEY;
+	SQL SELECT AsOfDate,
+	    AsOfTime,
+	    "Currency",
+	    GBPPrice,
+	    GBPValuation,
+	    LocalPrice,
+	    LocalValuation,
+	    PricingBasis,
+	    QuantityHeld,
+	    RegisterKey,
+	    Sedol,
+	    UniqueDesignation
+	FROM MajData.dbo."PooledValuations_Staging";
+
+//	-------------------------------------------------------------------
+//	TABLE: PooledInjWdl
+//	-------------------------------------------------------------------
+
+	PooledInjWdl:
+	LOAD
+	    Currency as Currency_PooledTrans,
+	    fabs(GrossAmountGBP) as GrossAmountGBP,
+	    fabs(GrossAmountLocal) as GrossAmountLocal,
+	    LastDayOfMonth,
+	    PriceGBP,
+	    PriceLocal,
+	    fabs(Quantity) as Quantity,
+	    TradeDate,
+	    TradeID,
+	    TradeType,
+	    TransactionReportKey,
+	    upper(Sedol&'==='&UniqueDesignation) as SedolUD_KEY;
+	SQL SELECT "Currency",
+	    GrossAmountGBP,
+	    GrossAmountLocal,
+	    LastDayOfMonth,
+	    PriceGBP,
+	    PriceLocal,
+	    Quantity,
+	    Sedol,
+	    TradeDate,
+	    TradeID,
+	    TradeType,
+	    TransactionReportKey,
+	    UniqueDesignation
+	FROM MajData.dbo."PooledInjWdl_staging";
+	
+	
+
+//	-------------------------------------------------------------------
+//	TABLE: SedolUD_KEY_SPLIT
+//	-------------------------------------------------------------------
+
+	NoConcatenate
+	SedolUD_KEY_SPLIT:
+	LOAD distinct SedolUD_KEY,
+		subfield(SedolUD_KEY,'===',1) as Sedol,
+		subfield(SedolUD_KEY,'===',2) as UniqueDesignation
+	Resident PooledValuations;
+
+//	-------------------------------------------------------------------
+//	CONCATENATE: SedolUD_KEY_SPLIT
+//	-------------------------------------------------------------------
+
+	Concatenate
+	LOAD distinct SedolUD_KEY,
+		subfield(SedolUD_KEY,'===',1) as Sedol,
+		subfield(SedolUD_KEY,'===',2) as UniqueDesignation
+	Resident PooledInjWdl;
+
+//	-------------------------------------------------------------------
+///$tab My MajIQ set up
+//	-------------------------------------------------------------------
+//	TABLE: MyMajIQ
+//	-------------------------------------------------------------------
+
+	/*
+	MyMajIQ:
+	LOAD [IDÂ Â ] as ID, 
+	     [ClientÂ Â ] as Client, 
+	     [TitleÂ Â ] as Title, 
+	     [Is ActiveÂ Â ] as IsActive, 
+	     [Set As DefaultÂ Â ] as IsDefault, 
+	     [Reporting FundÂ Â ] as ReportingFund, 
+	     [Reporting StrategyÂ Â ] as ReportingStrategy, 
+	     [Statement TypeÂ Â ] as StatementType, 
+	     [SalesForce Mandate IDÂ Â ] as SalesForceMandateID, 
+	     [Portfolio IDÂ Â ] as PortfolioID, 
+	     [Portfolio TypeÂ Â ] as PortfolioType, 
+	     [Performance IDÂ Â ] as PerformanceID, 
+	     [Performance TypeÂ Â ] as PerformanceType, 
+	     [BenchmarkÂ Â ] as Benchmark, 
+	     [Commission IDÂ Â ] as CommissionID, 
+	     [Attribution Fund and BenchmarkÂ Â ] as AttributionFundAndBenchmark, 
+	     [Voting IDÂ Â ] as VotingID, 
+	     [Liquidity StrategyÂ Â ] as LiquidityStrategy, 
+	     [Risk Fund and BenchmarkÂ Â ] as RiskFundAndBenchmark
+	FROM
+	[https://majinteractive.majedie.com/Lists/Client%20Mandates/QlikView%20all%20items.aspx]
+	(html, codepage is 1252, embedded labels, table is @1);
+	*/
+
+//	-------------------------------------------------------------------
+//	TABLE: MyMajIQ
+//	-------------------------------------------------------------------
+
+	MyMajIQ:
+	LOAD 
+	     [SalesForce Mandate IDÂ Â ] as Mandate_SalesForce, 
+	     upper([Performance IDÂ Â ]) as PerformanceID, 
+	     [Performance TypeÂ Â ] as PerformanceType
+	FROM
+	[http://majinteractiveapp.majedie.com/Lists/Client%20Mandates/QlikView%20all%20items.aspx]
+	(html, codepage is 1252, embedded labels, table is @1)
+	where [Performance TypeÂ Â ]='Client record';
+
+//	-------------------------------------------------------------------
+///$tab Link Share Register
+qualify *;
+unqualify 'UniqueDesignation';
+
+link:
+LOAD 
+	[Investor Code] as InvestorCode,
+	LINKDesignation,
+	Sedol, 
+	LinkUniqueDesignation, 
+	BNYUniqueDesignation,
+	BNYUniqueDesignation as UniqueDesignation
+FROM [\\maj-qv\Qlikview\QlikViewDocuments\Datasources\MAP - BNY to LINK Share Register.xlsx]
+(ooxml, embedded labels, header is 1 lines, table is [LINK Mappings]);
+
+unqualify *;
+
+rename table link to LinkShareRegister;
+///$tab Performance
+
+
+//	-------------------------------------------------------------------
+
+	//-> TABLE: PeriodicPerformance
+	PeriodicPerformance:
+	LOAD 
+		SylvanClientName,
+		SylvanCode,
+		upper(SylvanCode) as PerformanceID,
+		PerformanceIDCodified,
+		ReportingDate,
+		Period,
+		PortfolioReturn,
+		IndexReturn,
+		Inception,
+		NetOrGross,
+		Currency as Currency_Performance
+	where applymap('mapPerformanceDefaultID', PerformanceIDCodified, 0) = 1;	
+	SQL SELECT 
+		"Currency",
+		InceptionDate as Inception,
+		IndexReturn,
+		NetOrGross,
+		Period,
+		PortfolioReturn,
+		AsOfDate as ReportingDate,
+		ClientName as SylvanClientName,
+		PerformanceID as SylvanCode,
+		PerformanceIDCodified
+	FROM MajData.dbo.PeriodicPerformance;
+
+//	-------------------------------------------------------------------
+///$tab DateIslands
+//	-------------------------------------------------------------------
+//	TABLE: DateIsland_Start
+//	-------------------------------------------------------------------
+
+	DateIsland_Start:
+	LOAD distinct AsOfDate as Date_Start
+	Resident PooledValuations;
+
+//	-------------------------------------------------------------------
+//	TABLE: DateIsland_End
+//	-------------------------------------------------------------------
+
+	DateIsland_End:
+	LOAD distinct AsOfDate as Date_End
+	Resident PooledValuations;
+
+//	-------------------------------------------------------------------
