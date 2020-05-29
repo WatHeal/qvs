@@ -233,7 +233,7 @@
 	MAP_Mandate_PricingBasis:
 	Mapping LOAD DISTINCT
 		upper(UniqueDesignation_TEMP) as UniqueDesignation,
-		if(
+		if( // TODO add some more detailed documentation to this if statement, will help us remember in the future
 			Mandate_SalesForce_TEMP='0001',
 			'MIXED===DEALT',
 			if(
