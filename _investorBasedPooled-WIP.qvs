@@ -80,7 +80,7 @@
 
 //	-------------------------------------------------------------------
 
-	
+
 	//-> MAP: Map_AccountID_Name
 	Map_AccountID_Name:
 	Mapping
@@ -309,8 +309,8 @@
 			'Yes', // For 0001 unknown mandates, use dealt price regardless of time point (will be one dealing price per day)
 			if(
 				applymap('MAP_Mandate_PricingBasis',upper(UniqueDesignation),null())= upper(AsOfTime&'==='&PricingBasis),
-				'Yes',
-				'No'
+				1,
+				0
 			)
 		) as PricingBasis_Use_Chosen,
 
@@ -483,6 +483,3 @@
 	LOAD distinct
 		AsOfDate as Date_End
 	Resident PooledValuations;
-
-
-
