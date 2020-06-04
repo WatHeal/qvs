@@ -1,19 +1,7 @@
 ﻿///$tab Main
 //	===================================================================
 
-
-	//->	DEFAULT QLIKVIEW VARIABLES
-	SET ThousandSep=',';
-	SET DecimalSep='.';
-	SET MoneyThousandSep=',';
-	SET MoneyDecimalSep='.';
-	SET MoneyFormat='£#,##0.00;-£#,##0.00';
-	SET TimeFormat='hh:mm:ss';
-	SET DateFormat='DD/MM/YYYY';
-	SET TimestampFormat='DD/MM/YYYY hh:mm:ss[.fff]';
-	SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
-	SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
-
+	set vExport = 'yes'; //-> [yes|no]
 
 //	-------------------------------------------------------------------
 
@@ -38,7 +26,7 @@
 	Mapping LOAD Distinct
 		lower(EntityType_SalesForce) as _Key,
 	    [Eligible Claimant]
-	FROM [\\MAJ-QV\Qlikview\QlikViewDocuments\Datasources\Mappings\MAP - FSCS Eligibitlity Criteria.xlsx] // TODO  add path to source files, and move into mappings
+	FROM [\\MAJ-QV\Qlikview\QlikViewDocuments\Datasources\Mappings\MAP - FSCS Eligibitlity Criteria.xlsx] // TODO:  add path to source files, and move into mappings
 	(ooxml, embedded labels);
 
 
@@ -233,7 +221,7 @@
 	MAP_Mandate_PricingBasis:
 	Mapping LOAD DISTINCT
 		upper(UniqueDesignation_TEMP) as UniqueDesignation,
-		if( // TODO add some more detailed documentation to this if statement, will help us remember in the future
+		if( // TODO: add some more detailed documentation to this if statement, will help us remember in the future
 			Mandate_SalesForce_TEMP='0001',
 			'MIXED===DEALT',
 			if(
